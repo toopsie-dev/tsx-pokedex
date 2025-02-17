@@ -8,48 +8,37 @@ import { CapturedPokemonType, PokemonType } from "../Types";
 export const Pokedex = () => {
   const navigate = useNavigate();
   const [isGrid, setIsGrid] = useState(true);
-  const [offset] = useState(0);
   const [searchPokemon, setSearchPokemon] = useState("");
   const capturedPokemon = JSON.parse(
     localStorage.getItem("CapturedPokemon") || "[]"
   );
 
   // Fetching API Request
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    fetchNextPage,
-    fetchPreviousPage,
-    hasNextPage,
-    hasPreviousPage,
-  } = useInfiniteQuery({
-    queryKey: ["pokemon"],
-    queryFn: async ({ pageParam = 0 }) => {
-      const response = await fetch(
-        `https://pokeapi.co/api/v2/pokemon/?offset=${pageParam}&limit=20`
-      );
-      return await response.json();
-    },
-    initialPageParam: 0,
-    getPreviousPageParam: (firstPage) => {
-      const prevOffset = firstPage.previous
-        ? new URL(firstPage.previous).searchParams.get("offset")
-        : undefined;
-      return prevOffset ? parseInt(prevOffset) : undefined;
-    },
-    getNextPageParam: (lastPage) => {
-      const currentOffset = lastPage.next?.split("offset=")[1]?.split("&")[0];
-      return currentOffset ? parseInt(currentOffset) : undefined;
-    },
-  });
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage } =
+    useInfiniteQuery({
+      queryKey: ["pokemon"],
+      queryFn: async ({ pageParam = 0 }) => {
+        const response = await fetch(
+          `https://pokeapi.co/api/v2/pokemon/?offset=${pageParam}&limit=20`
+        );
+        return await response.json();
+      },
+      initialPageParam: 0,
+      getNextPageParam: (lastPage) => {
+        if (!lastPage.next) return undefined; // No more pages
+        const url = new URL(lastPage.next);
+        const nextOffset = url.searchParams.get("offset");
+        return nextOffset ? Number(nextOffset) : undefined; // 20, 40, 60,
+      },
+    });
 
   if (isLoading) return <h2>Page is Loading</h2>;
   if (isError) return <h2>{error.message}</h2>;
 
   // Extract and flatten a list of Pokemon
   const allPokemon = data?.pages.flatMap((page) => page.results) ?? [];
+
+  console.log(allPokemon);
 
   // Filter pokemon based on search result
   const filteredPokemon = allPokemon.filter((pokemon) =>
@@ -104,12 +93,15 @@ export const Pokedex = () => {
         {/* Pokedex Content */}
         <div className="flex flex-row gap-5 justify-start flex-wrap">
           {filteredPokemon.length > 0 ? (
-            filteredPokemon.map((pokemon: PokemonType, index: number) => {
+            filteredPokemon.map((pokemon: PokemonType) => {
               // Find the captured Pokemon that matches the pokemon pokedex
               const capturedPokemonData = capturedPokemon.find(
                 (captured: CapturedPokemonType) =>
                   captured.name.toLowerCase() === pokemon.name.toLowerCase()
               );
+
+              // Get the last id of url to make the data unique
+              const pokemonId = pokemon.url.split("/").filter(Boolean).pop();
 
               return (
                 <div
@@ -128,9 +120,7 @@ export const Pokedex = () => {
                     }
                   >
                     <img
-                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${
-                        offset + index + 1
-                      }.png`}
+                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`}
                     />
                     <p
                       className={
@@ -159,7 +149,7 @@ export const Pokedex = () => {
                     <span
                       onClick={() => {
                         const selectedPokemon = {
-                          index: index + 1,
+                          index: pokemonId,
                           ...pokemon,
                         };
                         localStorage.setItem(
@@ -186,18 +176,11 @@ export const Pokedex = () => {
         {/* Previous and next button */}
         <div className="flex gap-4 mt-4">
           <button
-            onClick={() => fetchPreviousPage()}
-            disabled={!hasPreviousPage}
-            className="px-4 py-2 bg-teal-700 text-white rounded disabled:bg-gray-400"
-          >
-            Previous
-          </button>
-          <button
             onClick={() => fetchNextPage()}
             disabled={!hasNextPage}
             className="px-4 py-2 bg-teal-700 text-white rounded disabled:bg-gray-400"
           >
-            Next
+            Load More
           </button>
         </div>
       </div>
