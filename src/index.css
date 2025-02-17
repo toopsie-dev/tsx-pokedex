@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-primary: "Exo 2", serif;
+  --content-width: "1440px";
+}
