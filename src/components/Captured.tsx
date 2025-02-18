@@ -19,14 +19,17 @@ export const Captured = () => {
 
   // Delete pokemon on CapturedPokemon localStorage
   const removePokemon = (index: number) => {
-    const updatedCapturedPokemon = capturedPokemon.filter(
-      (pokemon) => pokemon.index !== index
-    );
-    setCapturedPokemon(updatedCapturedPokemon);
-    localStorage.setItem(
-      "CapturedPokemon",
-      JSON.stringify(updatedCapturedPokemon)
-    );
+    const confirm = window.confirm("Do you want to remove this pokemon?");
+    if (confirm) {
+      const updatedCapturedPokemon = capturedPokemon.filter(
+        (pokemon) => pokemon.index !== index
+      );
+      setCapturedPokemon(updatedCapturedPokemon);
+      localStorage.setItem(
+        "CapturedPokemon",
+        JSON.stringify(updatedCapturedPokemon)
+      );
+    }
   };
 
   return (
@@ -35,7 +38,7 @@ export const Captured = () => {
         {/* Title container */}
         <div className="w-full flex justify-between items-center">
           <h1 className="font-primary text-gray dark:text-white text-7xl">
-            Captured
+            Captured Pokemon
           </h1>
           <div className="flex justify-between items-center gap-5">
             {/* Captured Link */}

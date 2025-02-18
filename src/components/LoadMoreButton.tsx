@@ -1,63 +1,67 @@
-import {
-  keepPreviousData,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { BsGrid3X3GapFill } from "react-icons/bs";
 import { FaThList } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { CapturedPokemonType, PokemonType } from "../Types";
 
-const fetchPokemon = async (page = 0) => {
-  const limit = 20;
-  const offset = page * limit; // e.g 2 * 20 = 40
-  const response = await fetch(
-    `https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`
-  );
-  const data = await response.json();
-  return {
-    pokemon: data.results,
-    hasMore: !!data.next, // return boolean
-  };
-};
-
-export const Pokedex = () => {
+export const LoadMoreButton = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [isGrid, setIsGrid] = useState(true);
   const [searchPokemon, setSearchPokemon] = useState("");
-  const [page, setPage] = useState(0);
   const capturedPokemon = JSON.parse(
     localStorage.getItem("CapturedPokemon") || "[]"
   );
 
   // Fetching API Request
-  const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
-    queryKey: ["pokemon", page],
-    queryFn: () => fetchPokemon(page),
-    placeholderData: keepPreviousData,
-    staleTime: 5000,
-  });
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage } =
+    useInfiniteQuery({
+      queryKey: ["pokemon"],
+      queryFn: async ({ pageParam = 0 }) => {
+        console.log(pageParam);
 
-  // Prefetch the next page!
+        const response = await fetch(
+          `https://pokeapi.co/api/v2/pokemon/?offset=${pageParam}&limit=20`
+        );
+        return await response.json();
+      },
+      initialPageParam: 0,
+      getNextPageParam: (lastPage) => {
+        if (!lastPage.next) return undefined; // No more pages
+        const url = new URL(lastPage.next);
+        const nextOffset = url.searchParams.get("offset");
+        console.log(nextOffset);
+        console.log(lastPage);
+        return nextOffset ? Number(nextOffset) : undefined; // 20, 40, 60,
+      },
+      maxPages: 20,
+    });
+
   useEffect(() => {
-    if (!isPlaceholderData && data?.hasMore) {
-      queryClient.prefetchQuery({
-        queryKey: ["pokemon", page + 1],
-        queryFn: () => fetchPokemon(page + 1),
-      });
-    }
-  }, [data, isPlaceholderData, page, queryClient]);
+    const handleScroll = () => {
+      if (
+        window.innerHeight + window.scrollY >=
+          document.body.offsetHeight - 100 &&
+        hasNextPage
+      ) {
+        fetchNextPage();
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [fetchNextPage, hasNextPage]);
 
   if (isLoading) return <h2>Page is Loading</h2>;
   if (isError) return <h2>{error.message}</h2>;
 
   // Extract and flatten a list of Pokemon
-  const allPokemon = data?.pokemon ?? [];
+  const allPokemon = data?.pages.flatMap((page) => page.results) ?? [];
+
+  console.log(allPokemon);
 
   // Filter pokemon based on search result
-  const filteredPokemon = allPokemon.filter((pokemon: PokemonType) =>
+  const filteredPokemon = allPokemon.filter((pokemon) =>
     pokemon.name.toLowerCase().includes(searchPokemon.toLowerCase())
   );
 
@@ -107,7 +111,7 @@ export const Pokedex = () => {
         </div>
 
         {/* Pokedex Content */}
-        <div className="flex flex-row gap-5 justify-between flex-wrap">
+        <div className="flex flex-row gap-5 justify-start flex-wrap">
           {filteredPokemon.length > 0 ? (
             filteredPokemon.map((pokemon: PokemonType) => {
               // Find the captured Pokemon that matches the pokemon pokedex
@@ -192,18 +196,11 @@ export const Pokedex = () => {
         {/* Previous and next button */}
         <div className="flex gap-4 mt-4">
           <button
-            onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
-            disabled={page === 0}
+            onClick={() => fetchNextPage()}
+            disabled={!hasNextPage}
             className="px-4 py-2 bg-teal-700 text-white rounded disabled:bg-gray-400"
           >
-            Previous
-          </button>
-          <button
-            onClick={() => setPage((prev) => prev + 1)}
-            disabled={!data?.hasMore}
-            className="px-4 py-2 bg-teal-700 text-white rounded disabled:bg-gray-400"
-          >
-            Next
+            Load More
           </button>
         </div>
       </div>
